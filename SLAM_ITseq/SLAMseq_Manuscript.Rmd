@@ -1,0 +1,85 @@
+---
+title: "SLAMseq_Manuscript"
+author: "Lin Tian"
+date: "4/5/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+## DE Analysis
+
+```{r}
+setwd("~/SLAM_seq")
+library(DESeq2)
+library(limma)
+library(RColorBrewer)
+library(ggplot2)
+library(ggrepel)
+load("~/SLAM_seq/SLAMseq_Manuscript.RData")
+SLAMseq.design <- model.matrix(~ 1 + tissue, data=SLAMseq.ann)
+SLAMseq.dds <- DESeqDataSetFromMatrix(round(SLAMseq.count.gene[, rownames(SLAMseq.ann)]), colData=SLAMseq.ann, design= ~ tissue)
+SLAMseq.dds <- DESeq(SLAMseq.dds)
+SLAMseq.rld <- rlog(SLAMseq.dds)
+```
+
+
+## PCA Plot
+```{r}
+SLAMseq.pca <- plotPCA(SLAMseq.rld, intgroup="tissue", returnData=TRUE)
+SLAMseq.ann$PC1 <- SLAMseq.pca$PC1
+SLAMseq.ann$PC2 <- SLAMseq.pca$PC2
+percentVar <- round(100 * attr(SLAMseq.pca, "percentVar"))
+makeLab <- function(x,pc) paste0("PC",pc,": ",x,"% variance")
+p1 <- ggplot() + geom_point(data=SLAMseq.ann, aes(x=PC1, y=PC2, col=tissue, shape=model), size=5) + scale_color_manual(values=c("#DC7D76", "#9ABAD1")) + xlab(makeLab(percentVar[1],1)) + ylab(makeLab(percentVar[2],2))
+p1 <- p1 + theme_bw() + theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), panel.border=element_blank(), axis.line.x=element_line(colour="black"), axis.line.y=element_line(colour="black")) + coord_fixed(ratio=0.5)
+ggsave("pca.pdf", p1, width=6.28, height=6.28, units="in", useDingbats=FALSE)
+```
+
+
+## Differential Gene Analysis
+
+```{r}
+SLAMseq_exp_mat <- assay(SLAMseq.rld)[!apply(assay(SLAMseq.rld), 1, function(x) all(x==0)), ]
+SLAMseq.fitlimma <- lmFit(SLAMseq_exp_mat, SLAMseq.design)
+SLAMseq.fitbayes <- eBayes(SLAMseq.fitlimma)
+SLAMseq.res <- topTable(SLAMseq.fitbayes, adjust="BH", number=nrow(SLAMseq.fitbayes))
+SLAMseq.res <- subset(SLAMseq.res, abs(logFC)>1.5 & adj.P.Val<1e-3)
+SLAMseq.res$LABEL <- ifelse(rownames(SLAMseq.res) %in% c("Fgfr1", "Vim", "Pdgfra", "Pdgfrb", "Acta2"), rownames(SLAMseq.res), NA)
+
+colorPal=colorRampPalette(c("#FFFFFF", brewer.pal(n=8, name="Oranges")))(256)
+heatscatter_ggplot <- ggplot() + stat_density2d(data=topTable(SLAMseq.fitbayes, adjust="BH", number=nrow(SLAMseq.fitbayes)), geom="tile", aes(x=logFC, y=-log10(adj.P.Val), fill=..density..^0.25, alpha=ifelse(..density..^0.25<0.2,0,1)), contour=FALSE) + scale_fill_gradientn(colours=colorPal) + guides(alpha="none") + geom_point(data=SLAMseq.res, aes(x=logFC, y=-log10(adj.P.Val), colour=logFC>0), size=1, shape=16) + scale_color_manual(values=c("#dc7d76", "#9abad1")) + geom_text_repel(data=SLAMseq.res, aes(x=logFC, y=-log10(adj.P.Val), label=LABEL), size = 2, label.padding = unit(0.25, "lines")) + theme_bw() + theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + coord_fixed(ratio=0.72)
+ggsave("heatscatter_ggplot.pdf", heatscatter_ggplot, width=6.28, height=6.28, units="in", useDingbats=FALSE)
+```
+
+
+## Enrichment Analysis
+
+```{r}
+library(clusterProfiler)
+library(enrichplot)
+library(pathview)
+library(org.Mm.eg.db)
+
+## LvMet
+SLAMseq.res_Met <- filter(SLAMseq.res, logFC < 0, adj.P.Val < 0.01)
+SLAMseq.res_Met_enrichGO <- enrichGO(gene=rownames(SLAMseq.res_Met), keyType="SYMBOL", OrgDb=org.Mm.eg.db, ont="BP", pAdjustMethod="BH", pvalueCutoff=0.01, qvalueCutoff=0.05)
+View(SLAMseq.res_Met_enrichGO@result)
+dotplot(SLAMseq.res_Met_enrichGO, showCategory=5)
+
+## GSEA
+geneList <- SLAMseq.res$logFC
+names(geneList) <- rownames(SLAMseq.res)
+geneList <- geneList[geneList!=0]
+geneList <- sort(geneList, decreasing = TRUE)
+SLAMseq_gseGO <- gseGO(geneList=geneList, keyType="SYMBOL", OrgDb=org.Mm.eg.db, ont="BP", minGSSize=10, maxGSSize=1000, pvalueCutoff=0.05, eps=0, verbose=FALSE)
+View(SLAMseq_gseGO@result)
+
+## Heatmap
+library(pheatmap)
+col_order <- c(seq(2, 12, 2), seq(1, 11, 2))
+GOIs_cell_cycle <- c("Cenpe", "Cenpc1", "Cenpw", "Cenpn", "Cep192", "Cenpk", "Cenpt", "Kif22", "Kifc5b", "Kif2c", "Kif18a", "Smc3", "Smc2", "Smc4", "Cdc6", "Cdca5", "Cdc16", "Ccne2", "Ccnb1", "Anapc4", "Anapc11", "Anapc4", "Anapc5", "Anapc15")
+pheatmap(SLAMseq_exp_mat[GOIs_cell_cycle, col_order], scale="row", cluster_cols=FALSE, cluster_rows=FALSE)
+```
+
