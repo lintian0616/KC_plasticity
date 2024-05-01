@@ -1,0 +1,246 @@
+---
+title: "MC38_KC_MP"
+author: "Lin Tian"
+date: "4/24/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Load Data
+
+```{r}
+setwd("~/KC_MP")
+library(Seurat)
+WPRE_scRNAseq <- readRDS("~/KC_MP/WPRE_scRNAseq.rds")
+WPRE_scRNAseq@meta.data
+table(WPRE_scRNAseq@meta.data$reportname, WPRE_scRNAseq@meta.data$IREERTTAWPRE > 0)
+head(WPRE_scRNAseq@reductions$umap@cell.embeddings)
+
+WPRE_scRNAseq_sub <- subset(WPRE_scRNAseq, subset=cluster %in% c("MPs", "KCs"))
+table(WPRE_scRNAseq_sub@meta.data$reportname, WPRE_scRNAseq_sub@meta.data$IREERTTAWPRE > 0)
+DimPlot(WPRE_scRNAseq_sub, reduction="umap", pt.size=0.2, group.by="cluster")
+DimPlot(WPRE_scRNAseq_sub, reduction="umap", pt.size=0.8, group.by="orig.ident", cols=c("#2264a1", "#f2a20d", "#94d1a5", "#cc91a4")) #8inch,8inch
+FeaturePlot(object=WPRE_scRNAseq_sub, pt.size=0.8, features=c("Clec4f"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+FeaturePlot(object=WPRE_scRNAseq_sub, pt.size=0.8, features=c("Spp1"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+FeaturePlot(object=WPRE_scRNAseq_sub, pt.size=0.8, features=c("Vim"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+FeaturePlot(object=WPRE_scRNAseq_sub, pt.size=0.8, features=c("Trem2"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+FeaturePlot(object=WPRE_scRNAseq_sub, pt.size=0.8, features=c("Cd68"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+FeaturePlot(object=WPRE_scRNAseq_sub, pt.size=0.8, features=c("Adgre1"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+
+WPRE_scRNAseq_sub <- AddMetaData(WPRE_scRNAseq_sub, metadata=as.numeric(WPRE_scRNAseq_sub@assays$RNA["IREERTTAWPRE", ])>0, col.name = "WPRE")
+DimPlot(WPRE_scRNAseq_sub, reduction="umap", pt.size=0.8, group.by="WPRE", cols=c("#d9d9d9", "#e41a1c"))
+```
+
+## Violin Plot
+
+```{r}
+WPRE_scRNAseq_sub2 <- subset(WPRE_scRNAseq_sub, subset= reportname %in% c("A0303", "A0304"))
+WPRE_scRNAseq_sub2 <- AddMetaData(WPRE_scRNAseq_sub2, metadata=paste0(WPRE_scRNAseq_sub2@meta.data$group, as.character(WPRE_scRNAseq_sub2@meta.data$IREERTTAWPRE > 0)), col.name = "WPRE")
+WPRE_scRNAseq_sub2 <- subset(WPRE_scRNAseq_sub2, WPRE != "A0303FALSE")
+WPRE_scRNAseq_sub2@meta.data$WPRE <- factor(WPRE_scRNAseq_sub2@meta.data$WPRE, levels=c("A0303TRUE", "A0304TRUE", "A0304FALSE"))
+VlnPlot(WPRE_scRNAseq_sub2, features=c("Nr1h3", "Id3", "Timd4", "Clec4f", "Mrc1", "Spp1", "Trem2"), group.by = "WPRE", pt.size=0)
+```
+
+
+## A304_WPRE recluster
+
+```{r}
+setwd("~/KC_MP")
+a304macroWPRE.recluster.anno <- readRDS("~/KC_MP/a304macroWPRE.recluster.anno.rds")
+a304macroWPRE.recluster.anno@meta.data
+DimPlot(a304macroWPRE.recluster.anno)
+
+SAMac_2019 <- c("Trem2", "Ctsd", "Cd63", "Apoe", "Ctss", "Ftl1", "Gpnmb", "C3ar1", "Spp1", "Cstb", "Plin2", "Fabp5", "Dhrs3", "Fth1", "Cd93", "Cx3cr1", "Ctsb", "Mt1", "Saa3", "Itgb5", "Tpt1", "C5ar1", "Hbb-bs", "Lgals1", "Ccl3", "Ms4a7", "Ccl9", "Lgmn", "Capg", "Sdcbp", "Lyz2", "Aprt", "Gm10116", "Gapdh", "Tgfbi", "Bri3", "Anxa5", "C1qb", "Fn1", "Lgals3", "Anxa3", "Calm2", "Hexb", "Jun", "Stab1", "Ctsl")
+
+KC_2019 <- c("Slc40a1", "Clec4f", "Cd5l", "Apoc1", "Vsig4", "Wfdc17", "Fcna", "Sdc3", "Folr2", "C1qc", "C1qa", "Hpgd", "Cfp", "Csf1r", "AW112010", "Il18bp", "C6", "Cd81", "Mrc1", "Creg1", "Clec1b", "Lgmn", "Fabp7", "Ctsc", "C1qb", "Grn", "Cdh5", "Blvrb", "Igf1", "Ptgs1", "Timd4", "Ctsb", "Marcks", "Pltp", "Maf", "Axl", "Cd164", "Aif1", "Dmpk", "Hmox1", "Vcam1", "Cd163", "Ccl24", "Slc29a1", "Adgre1", "Cd300ld", "Cd38", "mt-Co1", "Txn1", "Tcf7l2", "Serpinb6a", "Nr1h3", "BC005537", "Lpl", "Actn1", "C4b", "Cox5a", "Sepp1", "St3gal5", "Prdx1", "Slc15a3", "mt-Atp6", "Hsp90b1", "Itm2b", "Paqr9", "mt-Co3", "Ninj1", "Itgal", "Irf7", "mt-Nd2", "Msr1", "Mafb", "Lilra5", "Ctla2b", "Apoe", "Id3", "Ctsd", "Frmd4b", "Ptprj", "Aldh2", "Lgals3bp", "Gns", "Cd302", "Lrp1", "Ano6", "Siglece", "Fcgr4", "Cd44", "Tgm2", "mt-Nd4", "Acp5", "Abcc3", "Marco", "Sema6d", "mt-Co2", "Slc7a8", "Rxra", "mt-Cytb", "Gngt2", "Eif5b", "Rgl1", "Scarb2", "Trf", "Tcn2", "Sat1", "mt-Nd1", "Rgs1", "Sod1", "Adgre4", "Ftl1", "Tnfaip2", "Bst2", "Canx", "Ctsl", "Rhob", "Itsn1", "Acp2", "Ear2", "Man2b1", "Pcolce2", "Wdfy3", "Itga9", "Mertk", "Scp2", "Clec4n", "Cadm1")
+
+library(ggplot2)
+library(circlize)
+
+mat <- GetAssayData(a304macroWPRE.recluster.anno, slot="scale.data")
+Scott_2016 <- Scott_2016[Scott_2016 %in% rownames(mat)]
+KC_2019 <- KC_2019[KC_2019 %in% rownames(mat)]
+SAMac_2019 <- SAMac_2019[SAMac_2019 %in% rownames(mat)]
+cluster_info <- a304macroWPRE.recluster.anno@meta.data$orig.ident
+names(cluster_info) <- colnames(mat)
+cluster_info <- sort(cluster_info)
+
+col_fun2 <- colorRamp2(c(-4, 1, 2), c("#92b7d1", "white", "#d71e22"))
+
+row_info <- c(rep("KC", length(KC_2019)), rep("SAM", length(SAMac_2019)))
+names(row_info) <- c(KC_2019, SAMac_2019)
+
+ComplexHeatmap::Heatmap(as.matrix(mat[names(row_info), names(cluster_info)]), show_column_names=FALSE, column_split=cluster_info, row_split=row_info, col=col_fun2)
+```
+
+
+```{r}
+library(Seurat)
+dyn.load("/home/rstudio_cu02/anaconda3/envs/R4.0/lib/./libspatialite.so.7")
+library(monocle3)
+library(tidyverse)
+library(patchwork)
+
+dir.create("../A304scAnaly/Monocle3")
+combined <- readRDS("../A304scAnaly/a304macroWPRE.recluster.anno.rds")
+Idents(combined) <- 'MajorCluster'
+##创建CDS对象并预处理数据
+pbmc <- combined
+data <- GetAssayData(pbmc, assay = 'RNA', slot = 'counts')
+cell_metadata <- pbmc@meta.data
+gene_annotation <- data.frame(gene_short_name = rownames(data))
+rownames(gene_annotation) <- rownames(data)
+cds <- new_cell_data_set(data,
+                         cell_metadata = cell_metadata,
+                         gene_metadata = gene_annotation)
+
+cds <- preprocess_cds(cds, num_dim = 50)
+plot_pc_variance_explained(cds)
+#UMAP
+cds <- reduce_dimension(cds, preprocess_method = "PCA")
+p1 <- plot_cells(cds, reduction_method = "UMAP", color_cells_by = "MajorCluster")
+
+#import umap from seurat
+cds.embed <- cds@int_colData$reducedDims$UMAP
+int.embed <- Embeddings(pbmc, reduction = "umap")
+int.embed <- int.embed[rownames(cds.embed), ]
+
+cds@int_colData$reducedDims$UMAP <- int.embed
+p2 <- plot_cells(cds, reduction_method = "UMAP", color_cells_by = "MajorCluster")
+p <- p1|p2
+ggsave("../A304scAnaly/Monocle3/reduction.umap.pdf", p, width = 10, height = 3)
+
+#visualize some genes
+ciliated_genes <- c("Spp1", "Apoc1", "Clec4f", "Cd68", 
+                    "Vim", "Mki67", "Mcm3")
+plot_cells(cds, 
+           genes = ciliated_genes,
+           label_cell_groups =FALSE,
+           show_trajectory_graph = F)
+
+#cluster your cells for trajectory
+cds <- cluster_cells(cds)
+plot_cells(cds, color_cells_by = "partition")
+
+cds <- learn_graph(cds)
+p = plot_cells(cds, color_cells_by = "MajorCluster",
+               label_groups_by_cluster =FALSE,
+               show_trajectory_graph = TRUE)
+ggsave("../A304scAnaly/Monocle3/reduction.umap.trajectory.pdf", p, width = 6, height = 4)
+
+#pseudotime
+cds <- order_cells(cds)
+p = plot_cells(cds, color_cells_by = "pseudotime",
+               label_groups_by_cluster =FALSE,
+               show_trajectory_graph = TRUE)
+p
+ggsave("../A304scAnaly/Monocle3/reduction.umap.trajectory.pseudotime.pdf", p, width = 6, height = 4)
+
+cds <- order_cells(cds)
+p = plot_cells(cds, color_cells_by = "pseudotime",
+               label_groups_by_cluster =FALSE,
+               show_trajectory_graph = TRUE)
+p
+ggsave("../A304scAnaly/Monocle3/reduction.umap.trajectory.pseudotime.median.pdf", p, width = 6, height = 4)
+
+
+###############Velocyto###############
+library(velocyto.R)
+library(loomR)
+combined <- readRDS("../A304scAnaly/a304macroWPRE.recluster.anno.rds")
+ldat <- read.loom.matrices("../A304scAnaly/Velocyto/MC38_LvMet_B2_Aligned_UFE0L.loom")
+
+cellid = data.frame(rdsID = rownames(combined@meta.data),
+                    loomID = gsub("A030._", "MC38_LvMet_B2_Aligned_UFE0L:", rownames(combined@meta.data)))
+
+selldat <- ldat
+selldat$spliced <- selldat$spliced[, cellid$loomID]
+selldat$unspliced <- selldat$unspliced[, cellid$loomID]
+selldat$ambiguous <- selldat$ambiguous[, cellid$loomID]
+
+emat <- selldat$spliced
+rownames(emat) <- make.unique(rownames(emat))
+
+hist(log10(colSums(emat)),col='wheat',xlab='cell size')
+
+# this dataset has already been pre-filtered, but this is where one woudl do some filtering
+emat <- emat[,colSums(emat)>=1e3]
+library(pagoda2)
+r <- Pagoda2$new(emat,modelType='plain',trim=10,log.scale=T)
+r$adjustVariance(plot=T,do.par=T,gam.k=10)
+r$calculatePcaReduction(nPcs=100,n.odgenes=3e3,maxit=300)
+r$makeKnnGraph(k=30,type='PCA',center=T,distance='cosine')
+r$getKnnClusters(method=multilevel.community,type='PCA',name='multilevel')
+r$getEmbedding(type='PCA',embeddingType='tSNE',perplexity=50,verbose=T)
+
+par(mfrow=c(1,2))
+r$plotEmbedding(type='PCA',embeddingType='tSNE',show.legend=F,mark.clusters=T,min.group.size=10,shuffle.colors=F,mark.cluster.cex=1,alpha=0.3,main='cell clusters')
+gene <- "Ccl2"
+r$plotEmbedding(type='PCA',embeddingType='tSNE',colors=r$counts[, gene],main=gene)  
+
+#Velocity estimation
+emat <- selldat$spliced; 
+nmat <- selldat$unspliced; # disregarding spanning reads, as there are too few of them
+emat <- emat[,rownames(r$counts)]; 
+nmat <- nmat[,rownames(r$counts)]; # restrict to cells that passed p2 filter
+# take cluster labels
+cluster.label <- r$clusters$PCA$multilevel # take the cluster factor that was calculated by p2
+cell.colors <- sccore:::fac2col(cluster.label)
+# take embedding form p2
+emb <- r$embeddings$PCA$tSNE
+
+cell.dist <- as.dist(1-armaCor(t(r$reductions$PCA)))
+emat <- filter.genes.by.cluster.expression(emat,cluster.label,min.max.cluster.average = 0.2)
+nmat <- filter.genes.by.cluster.expression(nmat,cluster.label,min.max.cluster.average = 0.05)
+length(intersect(rownames(emat),rownames(nmat)))
+fit.quantile <- 0.02
+rvel.cd <- gene.relative.velocity.estimates(emat,nmat,deltaT=1,kCells=25,cell.dist=cell.dist,fit.quantile=fit.quantile)
+
+show.velocity.on.embedding.cor(emb,rvel.cd,n=200,scale='sqrt',
+                               cell.colors=ac(cell.colors,alpha=0.5),
+                               cex=0.8,arrow.scale=3,show.grid.flow=TRUE,
+                               min.grid.cell.mass=0.5,grid.n=40,arrow.lwd=1,do.par=F,cell.border.alpha = 0.1)
+##use auto defined UMAP
+emb <- combined@reductions$umap@cell.embeddings
+rownames(emb) <- cellid$loomID
+tmpb <- combined@reductions$pca@cell.embeddings
+rownames(tmpb) <- cellid$loomID
+
+cell.dist <- as.dist(1-armaCor(t(tmpb)))
+emat <- filter.genes.by.cluster.expression(emat,cluster.label,min.max.cluster.average = 0.2)
+nmat <- filter.genes.by.cluster.expression(nmat,cluster.label,min.max.cluster.average = 0.05)
+length(intersect(rownames(emat),rownames(nmat)))
+fit.quantile <- 0.02
+rvel.cd <- gene.relative.velocity.estimates(emat,nmat,deltaT=1,kCells=25,cell.dist=cell.dist,fit.quantile=fit.quantile)
+
+cluster.label <- Idents(combined) # take the cluster factor that was calculated by p2
+names(cluster.label) <- cellid$loomID
+cell.colors <- sccore:::fac2col(cluster.label)
+show.velocity.on.embedding.cor(emb,rvel.cd,n=200,scale='sqrt',
+                               cell.colors=ac(cell.colors,alpha=0.5),
+                               cex=0.8,arrow.scale=3,show.grid.flow=TRUE,
+                               min.grid.cell.mass=0.5,grid.n=40,arrow.lwd=1,do.par=F,cell.border.alpha = 0.1)
+
+
+gene <- "Clec4f"
+gene.relative.velocity.estimates(emat,nmat,deltaT=1,kCells = 25,kGenes=1,
+                                 fit.quantile=fit.quantile,cell.emb=emb,
+                                 cell.colors=cell.colors,cell.dist=cell.dist,
+                                 show.gene=gene,old.fit=rvel.cd,do.par=T)
+
+pdf("../A304scAnaly/Velocyto/cell.velo.pdf", width = 5, height = 5)
+show.velocity.on.embedding.cor(emb,rvel.cd,n=200,scale='sqrt',
+                               cell.colors=ac(cell.colors,alpha=0.5),
+                               cex=0.8,arrow.scale=3,show.grid.flow=TRUE,
+                               min.grid.cell.mass=0.5,grid.n=40,arrow.lwd=1,do.par=F,cell.border.alpha = 0.1)
+dev.off()
+
+
+pdf("../A304scAnaly/Velocyto/gene.velo.pdf", width = 14, height = 4)
+gene.relative.velocity.estimates(emat,nmat,deltaT=1,kCells = 25,kGenes=1,
+                                 fit.quantile=fit.quantile,cell.emb=emb,
+                                 cell.colors=cell.colors,cell.dist=cell.dist,
+                                 show.gene=gene,old.fit=rvel.cd,do.par=T)
+dev.off()
+```
