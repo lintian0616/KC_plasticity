@@ -1,3 +1,9 @@
-Raw sequencing reads of SLAM-seq can be downloaded from China National Center for Bioinformation (CNCB) under accession number PRJCA024187, and are publicly available as of the date of publication. If readers are interested in testing the code `run_full_pipeline_v2.sh`. Please contact the corresponding author Lin Tian (tianlin@sysucc.org.cn).
+Raw sequencing reads of SLAM-seq can be downloaded from China National Center for Bioinformation (CNCB) under accession number PRJCA024187, and are publicly available as of the date of publication. The custom pipeline `run_full_pipeline_v2.sh` was created by [Dr. Jia-xing Yue](https://orcid.org/0000-0002-2122-9221), and can process pair-end SLAM-seq data. 
 
-The processed RData file can be downloaded from this repository `SLAMseq_Manuscript.RData`. The R code `SLAMseq_Manuscript.Rmd` was used to generate the plot in **Extended Data Fig. 5a-e**.
+The processed RData file can be downloaded from [Zendo](https://zenodo.org/records/10809097).
+
+| File  | Description |
+|:---------------|:-------------|
+| adapter.fa | adapters used by Trimmomatic to trim the raw reads |
+| run_full_pipeline_v2.sh | bash script used to label nascent RNA |
+| SLAMseq_Manuscript.Rmd | R script used to visualize data |
