@@ -17,7 +17,7 @@ This study explores how liver-resident macrophages, known as Kupffer cells, chan
 You can use `git` command tool to clone the whole repository.
 
 ```
-git clone https://github.com/lintian0616/vesselNormalization.git
+git clone https://github.com/lintian0616/KC_plasticity.git
 ```
 
 Alternatively, you can click **Download ZIP** and later unzip the file in your local computer.
