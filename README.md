@@ -18,9 +18,12 @@ You can use `git` command tool to clone the whole repository.
 
 ```
 git clone https://github.com/lintian0616/vesselNormalization.git
-
 ```
 
 Alternatively, you can click **Download ZIP** and later unzip the file in your local computer.
+
+## Processed Data Download
+
+The processed RData objects have been uploaded to [Zendo #10809097](https://zenodo.org/records/10809097)
 
 Should you have any question, please do not hesitate to contact [Lin Tian](https://www.tianlab.info/)  (tianlin@sysucc.org.cn).
