@@ -1,0 +1,262 @@
+---
+title: "CITE-seq Data Analysis"
+author: "Lin Tian"
+date: "5/31/2024"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Loading Library
+
+```{r}
+setwd("~/CITE_seq")
+library(Seurat)
+library(ggplot2) 
+library(reshape2)
+library(dplyr)
+library(grid)
+library(tidyverse)
+```
+
+
+## Filtering
+
+```{r}
+input <- Read10X(data.dir = "MC38-LvMet-KC_raw_matrix/")
+data <- CreateSeuratObject(counts = input, project = "MC38_LvMet", min.cells = 5)
+data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^mt-")
+data <- subset(data, subset=nFeature_RNA>200 & nFeature_RNA<4000 & percent.mt < 10)
+data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
+data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(data)
+data <- ScaleData(data, features = all.genes)
+data <- RunPCA(data, features = VariableFeatures(object = data))
+DimPlot(data, reduction = "pca")
+data <- JackStraw(data, num.replicate = 100)
+data <- ScoreJackStraw(data, dims = 1:20)
+plot1 <- JackStrawPlot(data, dims = 1:20)
+plot2<-ElbowPlot(data)
+CombinePlots(plots = list(plot1, plot2))
+data <- FindNeighbors(data, dims = 1:20)
+data <- FindClusters(data, resolution = 1.2)
+data <- RunUMAP(data, dims = 1:20)
+data <- RunTSNE(data, dims = 1:20)
+pdf('umap.cluster.pdf')
+DimPlot(data, reduction = "umap",label = F)
+dev.off()
+pdf('tsne.cluster.pdf')
+DimPlot(data, reduction = "tsne",label = F)
+dev.off()
+
+for (l in levels (data)) {
+  cluster1.markers <- FindMarkers(data, ident.1 = l, min.pct = 0.01,logfc.threshold = 0.25)
+  cluster1.markers <- data.frame (gene = rownames (cluster1.markers))
+  write.table (cluster1.markers,paste0("cluster.",l,".diffgenes.xls"),row.names = F,col.names = T, sep='\t',quote = F)
+}
+
+## adt  	
+adtinputdir="MC38-LvMet-KC_filtered_citeseq_matrix/"
+RAW.adt <- Read10X (data.dir = adtinputdir)
+adt.names = rownames (RAW.adt)[32591:32718]
+print (adt.names)
+idx <- which(rownames (RAW.adt) %in% adt.names)
+RAW.adt <- RAW.adt[idx,]
+barcode <- gsub ("MC38_LvMet_","",rownames (data@meta.data))
+adt <- RAW.adt[,barcode]
+adt_assay <- CreateAssayObject (counts = adt)
+PRO <- RenameCells (data,new.names = barcode)
+PRO[["PROT"]] <- adt_assay
+DefaultAssay (PRO) <- "RNA"
+PRO <- RenameCells (PRO,add.cell.id = "MC38_LvMet")
+DefaultAssay (PRO) <- "PROT"
+PRO<- NormalizeData(PRO, normalization.method = 'CLR', margin = 2)
+saveRDS (PRO,file.pat(outdir,"integrated_cluster.rds"))
+```
+
+## Load Seurat Object
+
+```{r}
+CITE_seq <- readRDS("CITE_seq.rds")
+lvMet <- subset(CITE_seq, group%in%c("LvMet"))
+DimPlot(lvMet,reduction = "umap",label = TRUE)
+DefaultAssay(lvMet) <- 'RNA'
+```
+
+## Find variable genes for PCA
+
+```{r}
+lvMet <- FindVariableFeatures(object = lvMet,selection.method = "vst", nfeatures = 2000)
+all.gene <- rownames(lvMet)
+lvMet <- ScaleData(lvMet,features = all.gene) ## scale data
+```
+
+## Dimensional Reduction
+
+```{r}
+lvMet <- RunPCA(object=lvMet,features = VariableFeatures(object = lvMet))
+DimPlot(lvMet, reduction = "pca")
+ElbowPlot(lvMet,n=30)
+```
+
+## Cluster Cells
+
+```{r}
+lvMet <- FindNeighbors(lvMet, reduction = "pca", dims = 1:30)
+lvMet <- FindClusters(lvMet,resolution = 1.5, algorithm = 1)
+```
+
+# Run non-linear dimensional reduction (tSNE and uMAP)
+
+```{r}
+lvMet <- RunTSNE(object=lvMet,dims.use=1:30,do.fast=TRUE,check_duplicates = FALSE)
+lvMet <- RunUMAP(lvMet, reduction = "pca", dims = 1:30)
+DimPlot(lvMet, reduction = "umap",group.by = "seurat_clusters",label = TRUE)
+```
+
+# Find markers
+
+```{r}
+markers <- FindAllMarkers(object = lvMet, 
+                          only.pos = TRUE,
+                          logfc.threshold= 0.25,
+                          min.pct = 0.25)
+
+top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC)
+
+DoHeatmap(object = lvMet, features=top10$gene)
+
+write.table(markers,file="lvMet_dims30_resolution1.5.tsv",sep="\t") #write the markers of each cluster
+```
+
+## Determine cell types by markers according to The Human Protein Atlas and literature
+
+```{r}
+new.cluster.ids <- c("0"="Cxcl9+Mph", 
+                     "1"="Ccl5+Mph", 
+                     "2"="Ccl5+Mph", 
+                     "3"="Spp1+Mph", 
+                     "4"="Ccl5+Mph", 
+                     "5"="Ccl5+Mph", 
+                     "6"="Spp1+Mph", 
+                     "7"="Cxcl9+Mph", 
+                     "8"="Monocyte", 
+                     "9"="Ccl5+Mph", 
+                     "10"="Spp1+Mph", 
+                     "11"="Vcan+Mph", 
+                     "12"="Monocyte", 
+                     "13"="Dendritic Cells", 
+                     "14"="Stmn1+Mph", 
+                     "15"="Neutrophil", 
+                     "16"="Stmn1+Mph", 
+                     "17"="Spp1+Mph",
+                     "18"="KCs", 
+                     "19"="Cxcl9+Mph", 
+                     "20"="Dendritic Cells",
+                     "21"="Dendritic Cells"
+)
+```
+
+# Add cell type to the metadata as a new column
+
+```{r}
+lvMet <- RenameIdents(lvMet, new.cluster.ids)
+lvMet$newtype <- lvMet@active.ident
+DimPlot(lvMet, reduction = "umap",label = TRUE)
+# saveRDS(lvMet,"lvMet.rds") ## This is the Seurat for liver metastasis-associated macrophages.
+```
+
+# Annotion CITE-seq object with metastatic macrophage sub-clusters
+
+```{r}
+meta <- CITE_seq@meta.data
+meta$cell_name <- rownames(meta)
+meta$cluster <- as.character(CITE_seq@active.ident)
+ident <- meta$cluster
+names(ident) <- rownames(meta)
+
+ident1 <- as.character(lvMet@active.ident)
+names(ident1) <- names(lvMet@active.ident)
+for(i in names(ident1)){
+  if( i %in% meta$cell_name){
+    ident[i] <- ident1[i]}
+}
+meta$cluster <- ident
+CITE_seq@meta.data <- meta
+Idents(CITE_seq) <-'cluster'
+```
+
+## Visualize Annotated Seurat Object
+
+```{r}
+CITE_seq <- subset(CITE_seq, cluster%in%c("Ccl5+Mph","KCs","Spp1+Mph","Vcan+Mph","Stmn1+Mph","Cxcl9+Mph"))
+p1 <- DimPlot(CITE_seq,reduction="umap", label = TRUE, cols=c("#386cb0", "#a6761d", "#33a02c", "#fdbf6f", "#f0027f", "#737373"))
+pdf("CITE_seq_umap.pdf",height = 10,width = 11)
+p1
+dev.off()
+
+saveRDS(CITE_seq,"CITE_seq_after.rds")
+```
+
+
+## Plot the markers of each type
+
+```{r}
+CITE_seq <- readRDS("~/CITE_seq/CITE_seq_after.rds")
+FeaturePlot(CITE_seq, features=c("Spp1", "Cxcl9", "Ccr2", "Cx3cr1", "Cd68", "Clec4f"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+FeaturePlot(CITE_seq, features=c("Spi1", "C1qc", "Ccr2", "Cx3cr1", "Spp1", "Trem2"), cols=c("#d9d9d9", "#e31a1c"))
+markerdf2 <- read_tsv("ref_marker2.tsv")
+markerdf2$gene <- as.character(markerdf2$gene)
+vln.df <- as.data.frame(CITE_seq[["RNA"]]@data[markerdf2$gene,])
+vln.df$gene <- rownames(vln.df)
+vln.df <- melt(vln.df,id="gene")
+colnames(vln.df)[c(2,3)] <- c("CB","exp")
+CITE_seq$CB <- colnames(CITE_seq)
+anno <- CITE_seq@meta.data[,c("CB","cluster")]
+vln.df <- inner_join(vln.df,anno,by="CB")
+vln.df$gene <- factor(vln.df$gene,levels = markerdf2$gene) 
+
+vln.df%>%ggplot(aes(cluster,exp))+geom_violin(aes(fill=gene),scale = "width")+
+  facet_grid(vln.df$gene~.,scales = "free_y")+
+  scale_fill_brewer(palette = "Set3",direction = 1)+
+  scale_x_discrete("")+scale_y_continuous("")+
+  theme_bw()+
+  theme(
+    axis.text.x.bottom = element_text(angle = 45,hjust = 1,vjust = 1),
+    panel.grid.major = element_blank(),panel.grid.minor = element_blank(),
+    legend.position = "none"
+  )
+
+ggsave("marker_vln.pdf", width = 11, height = 22, units = "cm")
+```
+
+# Save the marker of each cluster
+
+```{r}
+Idents(CITE_seq) <-"cluster"
+markers <- FindAllMarkers(object = CITE_seq, only.pos = TRUE, logfc.threshold= 0.25, min.pct = 0.25)
+
+write.table(markers,file="CITE_seq_dims30_resolution1.5.tsv",sep="\t")
+```
+
+## Check Expression Levels for Proteins
+
+```{r}
+DefaultAssay (CITE_seq) <- "ADT"
+pros <- rownames(CITE_seq)
+pros[grep("Tim", pros)]
+pros[grep("CD49", pros)]
+pros[grep("CD11b", pros)]
+
+FeaturePlot(CITE_seq, features=c("A0567-Tim-4", "A0078-CD49d", "A0014-CD11b", "A0563-CX3CR1"), cols=c("#d9d9d9", "#fbb4ae", "#e31a1c"))
+
+FeaturePlot(CITE_seq, features=c("A0014-CD11b"), cols=c("#d9d9d9", "#e31a1c"))
+VlnPlot(CITE_seq, features=c("A0905-CD107a-LAMP-1-"), group.by="group", pt.size = 0)
+```
+
+
+
+
+
+
+

@@ -2,4 +2,4 @@ This is the code for processing the CITE-seq data. The Seurat Object can be down
 
 | File  | Description |
 |:---------------|:-------------|
-| CITEseq_FeaturePlot.Rmd | R script used to visualize data |
+| CITEseq_Analysis.Rmd | R script used to quality control, clustering cells and visualizing gene expression |
