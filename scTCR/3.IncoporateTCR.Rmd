@@ -1,0 +1,48 @@
+---
+title: "3. Incoporate TCR info into scRNA-seq"
+author: "Lin Tian"
+date: "2024-06-22"
+output: html_document
+---
+
+## Load object
+
+```{r}
+combined <- readRDS("~/scTCRseq/combined.rds") ## TCR-seq pair info
+CD8T <- readRDS("~/scTCRseq/CD8T.rds")
+```
+
+
+## rename the cell
+
+```{r}
+CD8T@meta.data$cell_name <- colnames(CD8T)
+CD8T$cell_name <- ifelse(CD8T$genotype == "Ccr2_HET", paste0("Ccr2_HET_", CD8T$cell_name), CD8T$cell_name)
+CD8T$cell_name <- ifelse(CD8T$genotype == "Ccr2_KO", paste0("Ccr2_KO_", CD8T$cell_name), CD8T$cell_name)
+CD8T<-RenameCells(CD8T,new.names=CD8T$cell_name)
+```
+
+##combine scTCR with scRNA
+
+```{r}
+seurat <- combineExpression(combined, CD8T, cloneCall="aa", 
+                            #group.by = "genotype", 
+                            proportion =FALSE,
+                            filterNA = TRUE, 
+                            cloneSize = c(Single=1, Small=5, Medium=20, Large=100, Hyperexpanded=500))
+#select the color
+colorblind_vector <- colorRampPalette(rev(c("#0D0887FF", "#47039FFF","#7301A8FF","#9C179EFF",
+                                            "#BD3786FF", "#D8576BFF","#ED7953FF","#FA9E3BFF", 
+                                            "#FDC926FF", "#F0F921FF")))
+
+use_colors <- c(CD8_Tn="#FC9272",CD8_Teff="#D73027",CD8_Tex="#6BAED6",CD8_Tex_term="#08519C")
+
+p6 <- DimPlot(seurat, group.by = "subcelltype2",label = T,cols = use_colors)
+p6
+p7 <- DimPlot(seurat, group.by = "cloneSize",label = F,pt.size = 1.2) + #NoLegend() +
+  scale_color_manual(values=colorblind_vector(5)) + 
+  theme(plot.title = element_blank())
+p7
+ggsave("scTCR_UMAP.svg", plot = p7, device = "svg",height = 10,width = 15)
+```
+

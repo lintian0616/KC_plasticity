@@ -1,0 +1,122 @@
+---
+title: "2. CD8+ T Clonal Analysis"
+author: "Lin Tian"
+date: "2024-06-22"
+output: html_document
+---
+
+## Visualization of gene expression
+
+```{r}
+CD8T <- readRDS("/home/shixi7/zhaochuang/project/kupffer/TCR/analyse/CD8T.rds")
+
+CD8T@meta.data$subcelltype2 <-
+  ordered(CD8T@meta.data$subcelltype2, levels = c("CD8_Tn","CD8_Teff","CD8_Tex","CD8_Tex_term"))
+
+use_colors <- c(CD8_Tn="#FC9272",CD8_Teff="#D73027",CD8_Tex="#6BAED6",CD8_Tex_term="#08519C")
+
+p1 <- DimPlot(CD8T, reduction = 'umap',group.by = "subcelltype2",split.by = 'genotype', label = F, cols = use_colors,pt.size = 1)
+p1
+ggsave("CD8T_UMAP.svg", plot = p1, device = "svg",height = 10,width = 20)
+
+##plot the heterogeneity of different genotypes
+library(ggalluvial)
+Ratio <- CD8T@meta.data %>%
+  group_by(genotype, subcelltype2) %>%
+  summarise(n=n()) %>%
+  mutate(relative_freq = n/sum(n))
+#select the color
+use_colors <- c(CD8_Tn="#FC9272",CD8_Teff="#D73027",CD8_Tex="#6BAED6",CD8_Tex_term="#08519C")
+p2 <- ggplot(Ratio, aes(x =genotype, y= relative_freq, fill = subcelltype2,
+                        stratum=subcelltype2, alluvium=subcelltype2)) +
+  geom_col(width = 0.5, color='black')+
+  geom_flow(width=0.5,alpha=0.4, knot.pos=0.5)+
+  theme_classic() +
+  labs(x='genotype',y = 'Ratio')+
+  scale_fill_manual(values = use_colors)
+p
+ggsave("CD8T_Sankey_diagram.svg", plot = p2, device = "svg",height = 10,width = 5)
+```
+
+
+## plot the markers of each type
+
+```{r}
+library(reshape2)
+markerdf2=read_tsv("/home/shixi7/zhaochuang/project/kupffer/Marker.tsv")
+markerdf2$gene=as.character(markerdf2$gene)
+vln.df=as.data.frame(CD8T[["RNA"]]@data[markerdf2$gene,])
+vln.df$gene=rownames(vln.df)
+vln.df=melt(vln.df,id="gene")
+colnames(vln.df)[c(2,3)]=c("CB","exp")
+CD8T$CB <- colnames(CD8T)
+anno=CD8T@meta.data[,c("CB","subcelltype2")]
+vln.df=inner_join(vln.df,anno,by="CB")
+vln.df$gene=factor(vln.df$gene,levels = markerdf2$gene) 
+
+p3 <- vln.df%>%ggplot(aes(subcelltype2,exp))+geom_violin(aes(fill=gene),scale = "width")+
+  facet_grid(vln.df$gene~.,scales = "free_y")+
+  scale_fill_brewer(palette = "Set3",direction = 1)+
+  scale_x_discrete("")+scale_y_continuous("")+
+  theme_bw()+
+  theme(
+    axis.text.x.bottom = element_text(angle = 45,hjust = 1,vjust = 1),
+    panel.grid.major = element_blank(),panel.grid.minor = element_blank(),
+    legend.position = "none"
+  )
+ggsave("marker_vln.svg", plot = p3, device = "svg",height = 20,width = 10,units = "cm")
+```
+
+
+## plot the marker of exhaustion
+
+```{r}
+library(scCustomize)
+gene <- c("Pdcd1","Lag3","Ctla4","Cd160")
+i=1
+plots=list()
+for (i in 1:length(gene)){
+  plots[[i]]=FeaturePlot_scCustom(seurat_object = CD8T, 
+                                  colors_use = colorRampPalette(c("#3288BD", "white", "#D53E4F" ))(50), 
+                                  features = gene[i])+NoAxes()#+
+  theme(panel.border = element_rect(fill = NA,color = "black",
+  size=1.5,linetype = "solid"))
+}
+
+library(patchwork)
+p4<-wrap_plots(plots, ncol = 2);p4
+ggsave("CD8T_Featureplots.svg", plot = p4, device = "svg",height = 10,width = 10)
+```
+
+
+## plot the Exhaustion Score
+
+```{r}
+#AddModuleScore
+Exhaustion <- c("Pdcd1","Lag3","Havcr2","Ctla4","Vsir","Cd160")
+Exhaustion = list(Exhaustion)
+Inscore <- AddModuleScore(CD8T,
+                          features = Exhaustion,
+                          ctrl = 100,
+                          name = "Exhaustion_Features")
+
+colnames(Inscore@meta.data)
+colnames(Inscore@meta.data)[14] <- "Exhaustion_Score"
+FeaturePlot(object = Inscore, features =c("Exhaustion_Score"))
+
+library(scCustomize)
+gene <- c("Exhaustion_Score")
+i=1
+plots=list()
+for (i in 1:length(gene)){
+  plots[[i]]=FeaturePlot_scCustom(seurat_object = Inscore, 
+                                  colors_use = colorRampPalette(c("#6BAED6","white", "#D53E4F", "#D53E4F"))(50), 
+                                  features = gene[i])+NoAxes()#+
+  theme(panel.border = element_rect(fill = NA,color = "black",
+                                    size=1.5,linetype = "solid"))
+}
+
+library(patchwork)
+p5<-wrap_plots(plots, ncol = 1);p5
+ggsave("CD8T_Featureplots2.svg", plot = p5, device = "svg",height = 5,width = 5)
+```

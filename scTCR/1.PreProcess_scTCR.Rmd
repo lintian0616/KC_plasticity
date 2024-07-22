@@ -1,0 +1,249 @@
+---
+title: "1. Pre Process scTCR-seq"
+author: "Lin Tian"
+date: "2024-06-22"
+output: html_document
+
+---
+
+## Load Packages
+
+```{r}
+setwd("~/scTCRseq")
+library(Seurat)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(grid)
+library(tidyverse)
+library(scRepertoire)
+```
+
+## Load Data
+
+```{r}
+Immune <- readRDS("~/scTCRseq/Immune.rds")
+
+# label the genotype (Supplementary Table 3)
+Immune@meta.data$genotype <- NA
+Immune@meta.data$genotype[Immune@meta.data$orig.ident == "A0307"] <- "Ccr2_HET"
+Immune@meta.data$genotype[Immune@meta.data$orig.ident == "A0308"] <- "Ccr2_KO"
+```
+
+## Quality control
+
+```{r}
+Immune[["percent.mt"]] <- PercentageFeatureSet(Immune, pattern = "^MT-|^mt-")
+Immune[["percent.rb"]] <- PercentageFeatureSet(Immune, pattern = "^RP[SL]|^Rp[sl]")
+VlnPlot(object = Immune, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"),group.by="orig.ident", ncol = 2)
+Immune <- subset(Immune, subset =nFeature_RNA > 200 & nFeature_RNA <= quantile(nFeature_RNA, 0.98) 
+                & nCount_RNA <= quantile(nCount_RNA, 0.98) 
+                & percent.mt < 10)
+
+# Normalize the data
+Immune <- NormalizeData(Immune, normalization.method = "LogNormalize", scale.factor = 10000)
+
+# Find variable genes for PCA 
+Immune <- FindVariableFeatures(object = Immune,selection.method = "vst", nfeatures = 2000)
+# Scale the data
+all.gene <- rownames(Immune)
+Immune <- ScaleData(Immune,features = all.gene)
+
+# Perform linear dimensional reduction
+Immune <- RunPCA(object=Immune,features = VariableFeatures(object = Immune))
+DimPlot(Immune, reduction = "pca")
+ElbowPlot(Immune,n=30)
+```
+
+## Cell Clustering
+
+```{r}
+Immune <- FindNeighbors(Immune, reduction = "pca", dims = 1:30)
+Immune <- FindClusters(Immune,resolution = 1.5, algorithm = 1)
+
+# Run non-linear dimensional reduction (tSNE and uMAP)
+Immune <- RunTSNE(object=Immune,dims.use=1:30,do.fast=TRUE,check_duplicates = FALSE)
+Immune <- RunUMAP(Immune, reduction = "pca", dims = 1:30)
+DimPlot(Immune, reduction = "umap",label = TRUE)
+DimPlot(Immune, reduction = "umap",group.by = "orig.ident",label = TRUE)
+
+# Find markers 
+markers <- FindAllMarkers(object = Immune, 
+                          only.pos = TRUE,
+                          logfc.threshold= 0.25,
+                          min.pct = 0.25)
+
+top10 <- markers %>% group_by(cluster) %>% 
+  top_n(n = 10, wt = avg_log2FC)
+
+DoHeatmap(object = Immune, features=top10$gene)
+#write the markers of each cluster
+write.table(markers,file="Immune_dims30_resolution1.5.tsv",sep="\t")
+
+new.cluster.ids <- c("0"="T cells", 
+                     "1"="T cells", 
+                     "2"="T cells", 
+                     "3"="T cells", 
+                     "4"="T cells", 
+                     "5"="T cells", 
+                     "6"="Myeloid cells", 
+                     "7"="T cells", 
+                     "8"="T cells", 
+                     "9"="T cells", 
+                     "10"="T cells", 
+                     "11"="T cells", 
+                     "12"="Myeloid cells", 
+                     "13"="T cells", 
+                     "14"="T cells", 
+                     "15"="T cells", 
+                     "16"="T cells", 
+                     "17"="T cells",
+                     "18"="T cells", 
+                     "19"="Dendritic cells", 
+                     "20"="pDC",
+                     "21"="T cells", 
+                     "22"="NK", 
+                     "23"="T cells",
+                     "24"="Dendritic cells"
+)
+
+# Add cell type to the metadata as a new column
+Immune <- RenameIdents(Immune, new.cluster.ids)
+Immune$celltype <- Immune@active.ident
+
+saveRDS(Immune,"Immune.rds")
+Immune <- readRDS("/home/shixi7/zhaochuang/project/kupffer/TCR/analyse/Immune.rds")
+```
+
+## Annotate the T cell
+
+```{r}
+Tcell <- subset(Immune,celltype%in%c("T cells"))
+
+#Quality control
+VlnPlot(object = Tcell, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"),group.by="orig.ident", ncol = 2)
+Tcell <- subset(Tcell, subset =nFeature_RNA > 500 & nFeature_RNA <= quantile(nFeature_RNA, 0.98) 
+                & nCount_RNA >1000 & nCount_RNA <= quantile(nCount_RNA, 0.98) 
+                & percent.mt < 10)
+
+# Find variable genes for PCA 
+Tcell <- FindVariableFeatures(object = Tcell,selection.method = "vst", nfeatures = 2000)
+
+# Scale the data
+all.gene <- rownames(Tcell)
+Tcell <- ScaleData(Tcell,features = all.gene)
+
+# Perform linear dimensional reduction
+Tcell <- RunPCA(object=Tcell,features = VariableFeatures(object = Tcell))
+DimPlot(Tcell, reduction = "pca")
+ElbowPlot(Tcell,n=30)
+
+# Cluster the cells
+Tcell <- FindNeighbors(Tcell, reduction = "pca", dims = 1:30)
+Tcell <- FindClusters(Tcell,resolution = 1.5, algorithm = 1)
+
+# Run non-linear dimensional reduction (tSNE and uMAP)
+Tcell <- RunTSNE(object=Tcell,dims.use=1:30,do.fast=TRUE,check_duplicates = FALSE)
+Tcell <- RunUMAP(Tcell, reduction = "pca", dims = 1:30)
+
+DimPlot(Tcell, reduction = "umap",label = TRUE)
+DimPlot(Tcell, reduction = "umap",label = TRUE,group.by="orig.ident")
+
+# Find markers 
+markers <- FindAllMarkers(object = Tcell, 
+                          only.pos = TRUE,
+                          logfc.threshold= 0.25,
+                          min.pct = 0.25)
+
+top10 <- markers %>% group_by(cluster) %>% 
+  top_n(n = 10, wt = avg_log2FC)
+
+DoHeatmap(object = Tcell, features=top10$gene)
+#write the markers of each cluster
+write.table(markers,file="Tcell_dims30_resolution1.5.tsv",sep="\t")
+
+new.cluster.ids <- c("0"="CD8", 
+                     "1"="CD8", 
+                     "2"="CD8", 
+                     "3"="CD8", 
+                     "4"="CD4", 
+                     "5"="CD8", 
+                     "6"="CD8", 
+                     "7"="CD8", 
+                     "8"="CD8", 
+                     "9"="CD8", 
+                     "10"="CD8", 
+                     "11"="CD8", 
+                     "12"="CD4", 
+                     "13"="CD4", 
+                     "14"="CD4", 
+                     "15"="CD8", 
+                     "16"="CD8", 
+                     "17"="CD8",
+                     "18"="uncharacterized", 
+                     "19"="CD8", 
+                     "20"="uncharacterized",
+                     "21"="γδT"
+)
+
+# Add cell type to the metadata as a new column
+Tcell <- RenameIdents(Tcell, new.cluster.ids)
+Tcell$subcelltype1 <- Tcell@active.ident
+
+DimPlot(Tcell, reduction = "umap",group.by = "subcelltype1",label = TRUE)
+```
+
+## Annotate the CD8T cell
+
+```{r}
+CD8T <-subset(Tcell,subcelltype1%in%c("CD8"))
+
+# Find variable genes for PCA 
+CD8T <- FindVariableFeatures(object = CD8T,selection.method = "vst", nfeatures = 2000)
+# Scale the data
+all.gene <- rownames(CD8T)
+CD8T <- ScaleData(CD8T,features = all.gene)
+
+# Perform linear dimensional reduction
+CD8T <- RunPCA(object=CD8T,features = VariableFeatures(object = CD8T))
+DimPlot(CD8T, reduction = "pca")
+ElbowPlot(CD8T,n=30)
+
+# Cluster the cells
+CD8T <- FindNeighbors(CD8T, reduction = "pca", dims = 1:30)
+CD8T <- FindClusters(CD8T,resolution = 1.5, algorithm = 1)
+
+# Run non-linear dimensional reduction (tSNE and uMAP)
+CD8T <- RunTSNE(object=CD8T,dims.use=1:30,do.fast=TRUE,check_duplicates = FALSE)
+CD8T <- RunUMAP(CD8T, reduction = "pca", dims = 1:30)
+DimPlot(CD8T, reduction = "umap",label = TRUE)
+
+new.cluster.ids <- c("0"="CD8_Tex_term", 
+                     "1"="CD8_Tex", 
+                     "2"="CD8_Tex", 
+                     "3"="CD8_Tex", 
+                     "4"="CD8_Tex", 
+                     "5"="CD8_Tex_term", 
+                     "6"="CD8_Tn", 
+                     "7"="CD8_Teff", 
+                     "8"="CD8_Tex", 
+                     "9"="CD8_Tex", 
+                     "10"="CD8_Teff", 
+                     "11"="CD8_Tex", 
+                     "12"="CD8_Tn", 
+                     "13"="CD8_Tn", 
+                     "14"="CD8_Tex", 
+                     "15"="CD8_Tex", 
+                     "16"="uncharacterized"
+)
+
+# Add cell type to the metadata as a new column
+CD8T <- RenameIdents(CD8T, new.cluster.ids)
+CD8T$subcelltype2 <- CD8T@active.ident
+
+CD8T <- subset(CD8T,subcelltype2!="uncharacterized")
+DimPlot(CD8T, reduction = "umap",group.by = "subcelltype2",label = TRUE)
+
+saveRDS(CD8T,"CD8T.rds")
+```
+
