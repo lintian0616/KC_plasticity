@@ -1,6 +1,6 @@
-This is the code for processing the scTCR-seq data. The Seurat Object can be downloaded from [Zendo](https://zenodo.org/records/12794202) (record number 12794202).
+This is the code for processing the scTCR-seq data. The Seurat Object can be downloaded from [Zendo #12794202](https://zenodo.org/records/12794202).
 
-There are three BIG files in [Zendo](https://zenodo.org/records/12794202):
+There are three BIG files in [Zendo #12794202](https://zenodo.org/records/12794202):
 
 * `Immune.rds`: this is the original scRNA-seq Seurat object that contains mostly CD8+ T cells, and some CD4+ T cells and dendritic cells;
 * `CD8T.rds`: this is the processed scRNA-seq Seurat object that only contains CD8+ T cells;
