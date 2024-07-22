@@ -11,6 +11,7 @@ This study explores how liver-resident macrophages, known as Kupffer cells, chan
 | WPRE_scRNAseq| WPRE_DataVisualization.Rmd | related to **Fig. 4** |
 | SLAM_ITseq | run\_full\_pipeline\_v2.sh & SLAMseq_Manuscript.Rmd |            related to **Extended Data Fig. 5** |
 | EpigeneticReprogramming | CUT\_Tag\_Pipeline.md | related to **Fig. 5** |
+| scTCR-seq | three R script files | related to **Extended Data Fig. 8** |
 
 ## Source Code/Data Download
 
