@@ -1,0 +1,168 @@
+---
+title: "CCR2_LMAM"
+author: "Lin Tian"
+date: "6/9/2024"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Load Packages
+
+```{r}
+library(Seurat)
+library(tidyverse)
+library(ggplot2)
+```
+
+# Load Seurat object
+
+```{r}
+WPRE_scRNAseq <- readRDS("~/KC_MP/WPRE_scRNAseq.rds")
+# Subset LMAM data 
+lvMet <- subset(WPRE_scRNAseq, sample%in%c("A0302","A0304"))
+LMAM <- subset(lvMet,cluster%in%c("KCs","MPs"))
+```
+
+# Find variable genes for PCA
+
+```{r}
+LMAM <- FindVariableFeatures(object = LMAM,selection.method = "vst", nfeatures = 2000)
+# Scale the data
+all.gene <- rownames(LMAM)
+LMAM <- ScaleData(LMAM,features = all.gene)
+
+# Perform linear dimensional reduction
+LMAM <- RunPCA(object=LMAM,features = VariableFeatures(object = LMAM))
+DimPlot(LMAM, reduction = "pca")
+ElbowPlot(LMAM,n=30)
+
+# Cluster the cells
+LMAM <- FindNeighbors(LMAM, reduction = "pca", dims = 1:30)
+LMAM <- FindClusters(LMAM,resolution = 1.5, algorithm = 1)
+```
+
+# Run non-linear dimensional reduction (tSNE and uMAP)
+
+```{r}
+LMAM <- RunTSNE(object=LMAM,dims.use=1:30,do.fast=TRUE,check_duplicates = FALSE)
+LMAM <- RunUMAP(LMAM, reduction = "pca", dims = 1:30)
+DimPlot(LMAM, reduction = "umap",label = TRUE)
+DimPlot(LMAM, reduction = "umap",group.by = "orig.ident",label = TRUE)
+
+# Find markers 
+markers <- FindAllMarkers(object = LMAM, 
+                              logfc.threshold= 0.25,
+                              min.pct = 0.25)
+
+top10 <- markers %>% group_by(cluster) %>% 
+  top_n(n = 10, wt = avg_log2FC)
+
+DoHeatmap(object = LMAM, features=top10$gene)
+#write the markers of each cluster
+write.table(markers,file="LMAM_dims30_resolution1.5.tsv",sep="\t")
+```
+
+
+## Determine cell types by markers according to The Human Protein Atlas and literature
+# Assign cell type to cluster
+
+```{r}
+new.cluster.ids <- c("0"="Spp1+Mph", 
+                     "1"="Spp1+Mph", 
+                     "2"="Ccl5+Mph", 
+                     "3"="Spp1+Mph", 
+                     "4"="Ccl5+Mph", 
+                     "5"="Kupffer cells", 
+                     "6"="Spp1+Mph", 
+                     "7"="Vcan+Mph", 
+                     "8"="Kupffer cells", 
+                     "9"="Spp1+Mph", 
+                     "10"="Cxcl9+Mph", 
+                     "11"="Stmn1+Mph", 
+                     "12"="Dendritic Cells", 
+                     "13"="Fibroblasts", 
+                     "14"="Fibroblasts", 
+                     "15"="Cxcl9+Mph", 
+                     "16"="Kupffer cells", 
+                     "17"="Monocyte",
+                     "18"="Dendritic Cells", 
+                     "19"="Dendritic Cells", 
+                     "20"="Dendritic Cells"
+)
+
+# Add cell type to the metadata as a new column
+LMAM <- RenameIdents(LMAM, new.cluster.ids)
+LMAM$newtype <- LMAM@active.ident
+```
+
+# Subset the real macrophage data
+
+```{r}
+LMAM <- subset(LMAM, newtype%in%c("Spp1+Mph","Cxcl9+Mph","Stmn1+Mph","Ccl5+Mph","Vcan+Mph"))
+# saveRDS(LMAM,"A0302_A0304_LMAM.rds")
+
+# LMAM <- readRDS("LMAM.rds")
+#save the plot
+p1 <- DimPlot(LMAM, reduction = "umap",label = TRUE, cols=c("#f0027f", "#386cb0", "#fdbf6f", "#33a02c", "#737373"))
+pdf("LMAMumap.pdf",height = 10,width = 10)
+p1
+dev.off()
+
+p2 <- DimPlot(LMAM, reduction = "umap",label = TRUE,group.by = "sample",cols = c("#f2a20d","#cc91a4"))
+pdf("LMAM_sample_umap.pdf",height = 10,width = 10)
+p2
+dev.off()
+```
+
+
+#plot the markers of each type
+
+```{r}
+library(reshape2)
+vln.df <- as.data.frame(LMAM[["RNA"]]@data[c("Spp1","Cxcl9","Stmn1","Ccl5","Vcan"),])
+vln.df$gene <- rownames(vln.df)
+vln.df <- melt(vln.df,id="gene")
+colnames(vln.df)[c(2,3)]=c("CB","exp")
+LMAM$CB <- colnames(LMAM)
+anno <- LMAM@meta.data[, c("CB", "newtype")]
+vln.df <- inner_join(vln.df,anno, by="CB")
+vln.df$gene <- factor(vln.df$gene,levels=c("Spp1","Cxcl9","Stmn1","Ccl5","Vcan"))
+
+vln.df %>% ggplot(aes(newtype, exp))+geom_violin(aes(fill=gene),scale = "width")+
+  facet_grid(vln.df$gene~.,scales = "free_y")+
+  scale_fill_brewer(palette = "Set3",direction = 1) +
+  scale_x_discrete("")+scale_y_continuous("")+
+  theme_bw()+
+  theme(
+    axis.text.x.bottom = element_text(angle = 45,hjust = 1,vjust = 1),
+    panel.grid.major = element_blank(),panel.grid.minor = element_blank(),
+    legend.position = "none"
+  )
+ggsave("marker_vln.pdf",width = 10,height = 15,units = "cm")
+
+
+##plot the heterogeneity of different individuals
+library(ggalluvial)
+Ratio <- LMAM@meta.data %>%
+  group_by(genotype, newtype) %>%
+  summarise(n=n()) %>%
+  mutate(relative_freq = n/sum(n))
+#select the color
+mycolor = c('#f0027f',
+            '#386cb0',
+            '#fdbf6f',
+            '#33a02c',
+            '#737373')
+
+p5 <- ggplot(Ratio, aes(x =genotype, y= relative_freq, fill = newtype,
+                  stratum=newtype, alluvium=newtype)) +
+  geom_col(width = 0.5, color='black')+
+  geom_flow(width=0.5,alpha=0.4, knot.pos=0.5)+
+  theme_classic() +
+  labs(x='Sample',y = 'Ratio')+
+  coord_flip()+
+  scale_fill_manual(values = mycolor)
+p5
+ggsave("Ratio.pdf",width = 22,height = 11,units = "cm")
+```
