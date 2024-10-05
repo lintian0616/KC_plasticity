@@ -1,7 +1,7 @@
-Availability of an inflammatory macrophage niche drives phenotypic and functional alterations in Kupffer cells
+Alternations in inflammatory macrophage niche drive phenotypic and functional plasticity in Kupffer cells
 =========
 
-This repository contains the source data and source codes for bioinformatic analysis. The pre-print version can be downloaded from [bioRxiv](https://www.biorxiv.org/content/10.1101/2024.04.23.590829v1.full).
+This repository contains the source data and source codes for bioinformatic analysis. The pre-print version of this Nature Communications paper can be downloaded from [bioRxiv](https://www.biorxiv.org/content/10.1101/2024.04.23.590829v1.full).
 
 This study explores how liver-resident macrophages, known as Kupffer cells, change in the presence of liver metastatic nodules. The research demonstrates that Kupffer cells can be reprogrammed into an inflammatory state due to an inflammatory environment, which displaces them with monocyte-derived macrophages through a process called epigenetic reprogramming. This transformation is thought to contribute to the immune-suppressive environment that hinders liver metastasis treatment.
 
@@ -9,9 +9,9 @@ This study explores how liver-resident macrophages, known as Kupffer cells, chan
 |:------------- |:---------------|:-------------|
 | CITEseq      | CITEseq_FeaturePlot.Rmd | related to **Fig. 1** |
 | WPRE_scRNAseq| WPRE_DataVisualization.Rmd | related to **Fig. 4** |
-| SLAM_ITseq | run\_full\_pipeline\_v2.sh & SLAMseq_Manuscript.Rmd |            related to **Extended Data Fig. 5** |
+| SLAM_ITseq | run\_full\_pipeline\_v2.sh & SLAMseq_Manuscript.Rmd |            related to **Supplementary Fig. 6** |
 | EpigeneticReprogramming | CUT\_Tag\_Pipeline.md | related to **Fig. 5** |
-| scTCR-seq | three R script files | related to **Extended Data Fig. 9** |
+| scTCR-seq | three R script files | related to **Supplementary Fig. 10** |
 
 ## Source Code/Data Download
 
