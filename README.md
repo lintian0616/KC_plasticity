@@ -1,7 +1,7 @@
 Alternations in inflammatory macrophage niche drive phenotypic and functional plasticity of Kupffer cells
 =========
 
-This repository contains the source data and source codes for bioinformatic analysis. The pre-print version of the **Nature Communications** paper can be downloaded from [bioRxiv](https://www.biorxiv.org/content/10.1101/2024.04.23.590829v1.full).
+This repository contains the source data and source codes for bioinformatic analysis. The paper was published in [Nature Communications](https://www.nature.com/articles/s41467-024-53659-7).
 
 This study explores how liver-resident macrophages, known as Kupffer cells, change in the presence of liver metastatic nodules. The research demonstrates that Kupffer cells can be reprogrammed into an inflammatory state due to an inflammatory environment, which displaces them with monocyte-derived macrophages through a process called epigenetic reprogramming. This transformation is thought to contribute to the immune-suppressive environment that hinders liver metastasis treatment.
 
